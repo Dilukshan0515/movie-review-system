@@ -1,0 +1,15 @@
+<h2>🏆 Top 5 Highest Rated Movies</h2>
+<div class="top-movies">
+  {% for movie in top_movies %}
+    <div class="movie-card">
+      <img src="{{ movie.image }}" alt="{{ movie.name }}" width="150">
+      <h3>{{ movie.name }}</h3>
+      <p>⭐ {{ movie.avg_rating }} / 5</p>
+      <a href="/movie/{{ movie.id }}">View Details</a>
+    </div>
+  {% endfor %}
+</div>
+<div class="corner-logo">
+  <img src="static/images/2.png" alt="FilmBuzz Logo">
+</div>
+

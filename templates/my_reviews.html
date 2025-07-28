@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>My Reviews</h2>
+    
+    {% if not reviews %}
+        <div class="alert alert-info">You haven't posted any reviews yet.</div>
+    {% else %}
+        <div class="list-group">
+            {% for review in reviews %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between">
+                    <h5>
+                        <a href="{{ url_for('movie_detail', id=review.movie_id) }}">
+                            {{ review.movie_name }}
+                        </a>
+                    </h5>
+                    <div>
+                        <span class="badge bg-primary">Rating: {{ review.rating }}/5</span>
+                        {% if review.is_edited %}
+                            <span class="badge bg-warning text-dark">Edited</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <p class="mt-2">{{ review.review_text }}</p>
+                <div class="d-flex justify-content-between">
+                    <small class="text-muted">
+                        Posted: {{ review.created_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% if review.updated_at %}
+                            | Last edited: {{ review.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                        {% endif %}
+                    </small>
+                    <div>
+                        <a href="{{ url_for('edit_review', review_id=review.id) }}" 
+                           class="btn btn-sm btn-outline-primary">Edit</a>
+                        <a href="{{ url_for('delete_review', review_id=review.id) }}" 
+                           class="btn btn-sm btn-outline-danger"
+                           onclick="return confirm('Are you sure you want to delete this review?')">Delete</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

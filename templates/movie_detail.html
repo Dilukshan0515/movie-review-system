@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ movie[1] }} - FilmBuzz</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="logo">
+      <img src="/static/images/2.png" alt="FilmBuzz Logo">
+      <span>FilmBuzz</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/">Home</a></li>
+      {% if session.get('user_id') %}
+        <li><a href="#">Hi, {{ session['username'] }}</a></li>
+        <li><a href="/logout">Logout</a></li>
+      {% else %}
+        <li><a href="/login">Login</a></li>
+        <li><a href="/signup">Sign Up</a></li>
+      {% endif %}
+    </ul>
+    <button id="toggle-mode" class="toggle-mode-btn">🌙 Dark Mode</button>
+  </nav>
+
+  <!-- Movie Details -->
+  <section class="movie-detail">
+    <div class="movie-header">
+      <img src="{{ movie[2] }}" alt="{{ movie[1] }} Poster">
+      <div class="movie-meta">
+        <h2>{{ movie[1] }}</h2>
+        <p><strong>Duration:</strong> {{ movie[3] }}</p>
+        <p><strong>Year:</strong> {{ movie[4] }}</p>
+        <p><strong>Genre:</strong> {{ movie[5] }}</p>
+        <p><strong>Description:</strong><br>{{ movie[6] }}</p>
+        
+        <!-- Add to Watchlist Button - Moved here under description -->
+        <div class="watchlist-section mt-3">
+          {% if session.get('user_id') %}
+            <form method="POST" action="{{ url_for('add_to_watchlist', movie_id=movie[0]) }}">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-bookmark"></i> 
+                {% if movie[0] in watchlist_ids %}Remove from{% else %}Add to{% endif %} Watchlist
+              </button>
+            </form>
+          {% else %}
+            <a href="{{ url_for('login') }}" class="btn btn-primary">
+              <i class="fas fa-bookmark"></i> Login to Add to Watchlist
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reviews Section -->
+  <section class="reviews-section">
+    <h3>📝 User Reviews</h3>
+    <!-- Add this where your reviews are displayed -->
+{% for review in reviews %}
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between">
+            <h5 class="card-title">{{ review.username }}</h5>
+            <div class="text-warning">
+                {% for i in range(1, 6) %}
+                    {% if i <= review.rating %}★{% else %}☆{% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        <p class="card-text">{{ review.review_text }}</p>
+        <p class="text-muted"><small>{{ review.created_at.strftime('%Y-%m-%d %H:%M') }}</small></p>
+        
+        {% if review.user_id == current_user_id %}
+        <div class="btn-group">
+            <a href="{{ url_for('edit_review', review_id=review.id) }}" 
+               class="btn btn-sm btn-outline-primary">Edit</a>
+            <a href="{{ url_for('delete_review', review_id=review.id) }}" 
+               class="btn btn-sm btn-outline-danger"
+               onclick="return confirm('Are you sure?')">Delete</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+  </section>
+
+  <!-- Review Form -->
+  {% if session.get('user_id') %}
+  <section class="review-form-section">
+    <h4>Leave a Review</h4>
+    <form method="POST" action="/add_review/{{ movie[0] }}">
+      <label>Your Rating:</label>
+      <div class="stars" id="star-rating">
+        <span class="star" data-value="1">★</span>
+        <span class="star" data-value="2">★</span>
+        <span class="star" data-value="3">★</span>
+        <span class="star" data-value="4">★</span>
+        <span class="star" data-value="5">★</span>
+      </div>
+      <input type="hidden" name="rating" id="rating-input" value="0">
+
+      <textarea name="review" placeholder="Write your review..." required></textarea>
+      <button type="submit">Submit Review</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <div class="back-link">
+    <a href="/"><i class="fas fa-arrow-left"></i> Back to Home</a>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+  <p>&copy; 2025 FilmBuzz. All rights reserved.</p>
+  <div class="contact-info">
+    <p>📞 Contact: 077-4556125</p>
+    <p>📧 Email: filmbuzz@gmail.com</p>
+  </div>
+  <div class="quote">
+    <em>"Our audience is our biggest critic — and our greatest pride!"</em>
+  </div>
+  <div class="socials">
+    <a href="#"><i class="fab fa-facebook-f"></i></a>
+    <a href="#"><i class="fab fa-instagram"></i></a>
+    <a href="#"><i class="fab fa-twitter"></i></a>
+  </div>
+</footer>
+
+  <!-- JS: Theme + Stars -->
+  <script>
+    // Theme toggle
+    const toggleBtn = document.getElementById("toggle-mode");
+    const currentTheme = localStorage.getItem("theme");
+
+    if (currentTheme === "dark") {
+      document.body.classList.add("dark-mode");
+      toggleBtn.innerText = "☀️ Light Mode";
+    }
+
+    toggleBtn.addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+      const isDark = document.body.classList.contains("dark-mode");
+      toggleBtn.innerText = isDark ? "☀️ Light Mode" : "🌙 Dark Mode";
+      localStorage.setItem("theme", isDark ? "dark" : "light");
+    });
+
+    // Star rating
+    const stars = document.querySelectorAll(".star");
+    const ratingInput = document.getElementById("rating-input");
+
+    stars.forEach(star => {
+      star.addEventListener("click", () => {
+        const rating = star.getAttribute("data-value");
+        ratingInput.value = rating;
+        stars.forEach(s => s.classList.remove("active"));
+        for (let i = 0; i < rating; i++) {
+          stars[i].classList.add("active");
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
