@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin Panel{% endblock %} - FilmBuzz</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" href="/static/images/2.png" type="image/png">
+</head>
+<body>
+    <div class="admin-container">
+        <div class="sidebar">
+            <div class="admin-header">
+                <img src="{{ url_for('static', filename='images/2.png') }}" alt="FilmBuzz Logo" class="logo">
+                <h2>FilmBuzz Admin</h2>
+                <p class="subtitle">CINEMA MANAGEMENT</p>
+            </div>
+            <nav>
+                <ul>
+                    <li>
+                        <a href="{{ url_for('admin_dashboard') }}" {% if request.path == url_for('admin_dashboard') %}class="active"{% endif %}>
+                            <i class="fas fa-tachometer-alt"></i> Dashboard
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('manage_users') }}" {% if request.path == url_for('manage_users') %}class="active"{% endif %}>
+                            <i class="fas fa-users"></i> Manage Users
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('add_movie') }}" {% if request.path == url_for('add_movie') %}class="active"{% endif %}>
+                            <i class="fas fa-plus-circle"></i> Add Movie
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('manage_movies') }}" {% if request.path == url_for('manage_movies') %}class="active"{% endif %}>
+                            <i class="fas fa-film"></i> Manage Movies
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('logout') }}">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        <div class="main-content">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>

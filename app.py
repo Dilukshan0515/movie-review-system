@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect, session, url_for, f
 from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
 from db_config import db_config
+from functools import wraps
+
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
@@ -12,8 +14,259 @@ app.config['MYSQL_PASSWORD'] = db_config['password']
 app.config['MYSQL_DB'] = db_config['database']
 
 mysql = MySQL(app)
+# In your app.py (right after mysql = MySQL(app))
+# In your app.py (right after mysql = MySQL(app))
+with app.app_context():
+    cur = mysql.connection.cursor()
+    # Check if admin exists
+    cur.execute("SELECT * FROM users WHERE username = 'admin'")
+    admin_exists = cur.fetchone()
+    if not admin_exists:
+        admin_password = generate_password_hash('admin123')
+        cur.execute("""
+            INSERT INTO users (username, password, is_admin, is_active) 
+            VALUES (%s, %s, %s, %s)
+            """, 
+            ('admin', admin_password, True, True))
+        mysql.connection.commit()
+        print("Admin user created with username: admin and password: admin123")
+    cur.close()
 
 # ROUTES
+# Admin Login Route
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        cur = mysql.connection.cursor()
+        cur.execute("SELECT * FROM users WHERE username = %s AND is_admin = 1", (username,))
+        admin = cur.fetchone()
+        cur.close()
+        
+        if admin and check_password_hash(admin[2], password):
+            if not admin[4]:  # Check is_active status
+                flash('Your admin account is disabled', 'danger')
+                return redirect(url_for('admin_login'))
+                
+            session['user_id'] = admin[0]
+            session['username'] = admin[1]
+            session['is_admin'] = True
+            flash('Admin login successful!', 'success')
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash('Invalid admin credentials', 'danger')
+    return render_template('admin_login.html')
+
+# Update regular login to exclude admins
+
+
+# Add admin logout if needed
+@app.route('/admin/logout')
+def admin_logout():
+    session.clear()
+    flash('You have been logged out from admin panel', 'info')
+    return redirect(url_for('admin_login'))
+
+def validate_admin_login(username, password):
+    if username != 'admin':
+        return False
+    
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT password FROM users WHERE username = 'admin'")
+    admin_record = cur.fetchone()
+    cur.close()
+    
+    if admin_record and check_password_hash(admin_record[0], password):
+        return True
+    return False
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_admin'):
+            flash('Please login as admin to access this page', 'danger')
+            return redirect(url_for('admin_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    if not session.get('is_admin'):
+        flash('Unauthorized access', 'danger')
+        return redirect('/')
+    
+    cur = mysql.connection.cursor()
+    
+    # Get stats
+    cur.execute("SELECT COUNT(*) FROM users WHERE is_admin = 0")
+    user_count = cur.fetchone()[0]
+    
+    cur.execute("SELECT COUNT(*) FROM movies")
+    movie_count = cur.fetchone()[0]
+    
+    cur.execute("SELECT COUNT(*) FROM reviews")
+    review_count = cur.fetchone()[0]
+    
+    # Get recent activities
+    cur.execute("""
+        SELECT a.action_type, a.target_type, a.created_at, u.username as admin_name
+        FROM admin_actions a
+        JOIN users u ON a.admin_id = u.id
+        ORDER BY a.created_at DESC
+        LIMIT 10
+    """)
+    recent_activities = cur.fetchall()
+    
+    cur.close()
+    
+    return render_template('admin_dashboard.html',
+                         user_count=user_count,
+                         movie_count=movie_count,
+                         review_count=review_count,
+                         recent_activities=recent_activities)
+
+@app.route('/admin/manage_users')
+def manage_users():
+    if not session.get('is_admin'):
+        flash('Unauthorized access', 'danger')
+        return redirect('/')
+    
+    cur = mysql.connection.cursor()
+    cur.execute("""
+        SELECT id, username, is_active, created_at 
+        FROM users 
+        WHERE is_admin = 0
+        ORDER BY created_at DESC
+    """)
+    users = cur.fetchall()
+    cur.close()
+    
+    return render_template('manage_users.html', users=users)
+
+@app.route('/admin/toggle_user/<int:user_id>')
+def toggle_user(user_id):
+    if not session.get('is_admin'):
+        flash('Unauthorized access', 'danger')
+        return redirect('/')
+    
+    cur = mysql.connection.cursor()
+    
+    # Get current status
+    cur.execute("SELECT is_active FROM users WHERE id = %s", (user_id,))
+    current_status = cur.fetchone()
+    
+    if current_status:
+        new_status = not current_status[0]
+        cur.execute("UPDATE users SET is_active = %s WHERE id = %s", (new_status, user_id))
+        
+        # Log the action
+        action = "Enabled" if new_status else "Disabled"
+        cur.execute("""
+            INSERT INTO admin_actions 
+            (admin_id, action_type, target_type, target_id, details)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (session['user_id'], f"user_{action.lower()}", "user", user_id, f"User {action} by admin"))
+        
+        mysql.connection.commit()
+        flash(f'User {action.lower()} successfully', 'success')
+    
+    cur.close()
+    return redirect(url_for('manage_users'))
+
+@app.route('/admin/manage_movies')
+def manage_movies():
+    if not session.get('is_admin'):
+        flash('Unauthorized access', 'danger')
+        return redirect('/')
+    
+    cur = mysql.connection.cursor()
+    cur.execute("SELECT * FROM movies ORDER BY created_at DESC")
+    movies = cur.fetchall()
+    cur.close()
+    
+    return render_template('manage_movies.html', movies=movies)
+
+@app.route('/admin/delete_movie/<int:movie_id>')
+def delete_movie(movie_id):
+    if not session.get('is_admin'):
+        flash('Unauthorized access', 'danger')
+        return redirect('/')
+    
+    cur = mysql.connection.cursor()
+    
+    try:
+        # Log the action first
+        cur.execute("SELECT name FROM movies WHERE id = %s", (movie_id,))
+        movie_name = cur.fetchone()[0]
+        
+        cur.execute("""
+            INSERT INTO admin_actions 
+            (admin_id, action_type, target_type, target_id, details)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (session['user_id'], "movie_delete", "movie", movie_id, f"Deleted movie: {movie_name}"))
+        
+        # Delete associated reviews and watchlist entries
+        cur.execute("DELETE FROM reviews WHERE movie_id = %s", (movie_id,))
+        cur.execute("DELETE FROM watchlists WHERE movie_id = %s", (movie_id,))
+        
+        # Delete the movie
+        cur.execute("DELETE FROM movies WHERE id = %s", (movie_id,))
+        
+        mysql.connection.commit()
+        flash('Movie deleted successfully', 'success')
+    except Exception as e:
+        mysql.connection.rollback()
+        flash(f'Error deleting movie: {str(e)}', 'danger')
+    finally:
+        cur.close()
+    
+    return redirect(url_for('manage_movies'))
+
+@app.route('/admin/add_movie', methods=['GET', 'POST'])
+def add_movie():
+    if not session.get('is_admin'):
+        flash('Unauthorized access', 'danger')
+        return redirect('/')
+    
+    if request.method == 'POST':
+        name = request.form['name']
+        image_url = request.form['image_url']
+        duration = request.form['duration']
+        year = request.form['year']
+        genre = request.form['genre']
+        description = request.form['description']
+        
+        cur = mysql.connection.cursor()
+        try:
+            cur.execute("""
+                INSERT INTO movies (name, image_url, duration, year, genre, description)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (name, image_url, duration, year, genre, description))
+            
+            # Log the action
+            movie_id = cur.lastrowid
+            cur.execute("""
+                INSERT INTO admin_actions 
+                (admin_id, action_type, target_type, target_id, details)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (session['user_id'], "movie_add", "movie", movie_id, f"Added movie: {name}"))
+            
+            mysql.connection.commit()
+            flash('Movie added successfully!', 'success')
+            return redirect(url_for('manage_movies'))
+        except Exception as e:
+            mysql.connection.rollback()
+            flash(f'Error adding movie: {str(e)}', 'danger')
+        finally:
+            cur.close()
+    
+    return render_template('add_movie.html')
+
+
+
+
 @app.route('/')
 def index():
     cur = mysql.connection.cursor()
@@ -37,16 +290,41 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password_input = request.form['password']
+        
+        # Special check for admin
+        if username == 'admin' and validate_admin_login(username, password_input):
+            cur = mysql.connection.cursor()
+            cur.execute("SELECT * FROM users WHERE username='admin'")
+            admin_user = cur.fetchone()
+            cur.close()
+            
+            session['user_id'] = admin_user[0]
+            session['username'] = admin_user[1]
+            session['is_admin'] = True
+            flash('Admin login successful!', 'success')
+            return redirect(url_for('admin_dashboard'))
+        
+        # Regular user login
         cur = mysql.connection.cursor()
         cur.execute("SELECT * FROM users WHERE username=%s", (username,))
         user = cur.fetchone()
+        
         if user and check_password_hash(user[2], password_input):
+            if not user[4]:  # Check is_active status
+                flash('Your account is disabled', 'danger')
+                return redirect(url_for('login'))
+                
             session['user_id'] = user[0]
             session['username'] = user[1]
             session['is_admin'] = user[3]
+            
+            # Redirect admin to admin dashboard
+            if user[3]:  # If user is admin
+                return redirect(url_for('admin_dashboard'))
             return redirect('/')
+        else:
+            flash('Invalid username or password', 'danger')
     return render_template('login.html')
-
 @app.route('/logout')
 def logout():
     session.clear()
@@ -142,23 +420,7 @@ def add_review(movie_id):
         
     return redirect(url_for('movie_detail', id=movie_id))
 
-@app.route('/admin/add_movie', methods=['GET', 'POST'])
-def add_movie():
-    if not session.get('is_admin'):
-        return redirect('/')
-    if request.method == 'POST':
-        name = request.form['name']
-        image_url = request.form['image_url']
-        duration = request.form['duration']
-        year = request.form['year']
-        genre = request.form['genre']
-        description = request.form['description']
-        cur = mysql.connection.cursor()
-        cur.execute("INSERT INTO movies (name, image_url, duration, year, genre, description) VALUES (%s, %s, %s, %s, %s, %s)",
-                    (name, image_url, duration, year, genre, description))
-        mysql.connection.commit()
-        return redirect('/')
-    return 
+
 # Add these new routes to your existing app.py
 
 @app.route('/my_reviews')
@@ -312,7 +574,8 @@ def my_watchlist():
     """, (user_id,))
     watchlist_movies = cur.fetchall()
     return render_template('watchlist.html', movies=watchlist_movies)
-    
+
+
 '''
     <form method="post">
       Name: <input name="name"><br>

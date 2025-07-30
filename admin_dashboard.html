@@ -1,0 +1,228 @@
+{% extends "admin_base.html" %}
+
+{% block content %}
+<div class="admin-dashboard">
+    <h1><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h1>
+    
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-tile bg-blue">
+            <i class="fas fa-users"></i>
+            <div>
+                <h3>Total Users</h3>
+                <p>{{ user_count }}</p>
+            </div>
+        </div>
+        
+        <div class="stat-tile bg-green">
+            <i class="fas fa-film"></i>
+            <div>
+                <h3>Total Movies</h3>
+                <p>{{ movie_count }}</p>
+            </div>
+        </div>
+        
+        <div class="stat-tile bg-amber">
+            <i class="fas fa-star"></i>
+            <div>
+                <h3>Total Reviews</h3>
+                <p>{{ review_count }}</p>
+            </div>
+        </div>
+        
+        <div class="stat-tile bg-teal">
+            <i class="fas fa-history"></i>
+            <div>
+                <h3>Recent Activity</h3>
+                <p>{{ recent_activities|length }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Activity Log -->
+    <div class="activity-panel">
+        <div class="panel-header">
+            <h2><i class="fas fa-list-alt"></i> Recent Activity Log</h2>
+        </div>
+        <div class="panel-body">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Admin</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for activity in recent_activities %}
+                    <tr>
+                        <td>
+                            {% if activity.action_type == 'user_enable' %}
+                                <span class="badge success"><i class="fas fa-user-check"></i> Enabled</span>
+                            {% elif activity.action_type == 'user_disable' %}
+                                <span class="badge danger"><i class="fas fa-user-times"></i> Disabled</span>
+                            {% elif activity.action_type == 'movie_add' %}
+                                <span class="badge info"><i class="fas fa-plus-circle"></i> Added</span>
+                            {% elif activity.action_type == 'movie_delete' %}
+                                <span class="badge warning"><i class="fas fa-trash-alt"></i> Deleted</span>
+                            {% else %}
+                                <span class="badge"><i class="fas fa-info-circle"></i> {{ activity.action_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ activity.target_type }}</td>
+                        <td>{{ activity.admin_name }}</td>
+                        <td>{{ activity.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Base Styles */
+.admin-dashboard {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-tile {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-radius: 8px;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-tile i {
+    font-size: 1.8rem;
+    margin-right: 15px;
+}
+
+.stat-tile h3 {
+    font-size: 0.9rem;
+    margin: 0 0 5px 0;
+    font-weight: 500;
+}
+
+.stat-tile p {
+    font-size: 1.3rem;
+    margin: 0;
+    font-weight: 700;
+}
+
+/* Color Themes */
+.bg-blue { background: linear-gradient(135deg, #4285F4, #3367D6); }
+.bg-green { background: linear-gradient(135deg, #34A853, #2D8E49); }
+.bg-amber { background: linear-gradient(135deg, #FBBC05, #E6A303); }
+.bg-teal { background: linear-gradient(135deg, #17A2B8, #138496); }
+
+/* Activity Panel */
+.activity-panel {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.panel-header {
+    background: #2C3E50;
+    color: white;
+    padding: 12px 20px;
+}
+
+.panel-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel-body {
+    background: white;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+th {
+    background: #F8F9FA;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+}
+
+tr:hover {
+    background: #F5F5F5;
+}
+
+/* Badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.badge.success { background: #E6FFED; color: #22863A; }
+.badge.danger { background: #FFEBEE; color: #B71C1C; }
+.badge.info { background: #E3F2FD; color: #1565C0; }
+.badge.warning { background: #FFF8E1; color: #FF8F00; }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .admin-dashboard {
+        padding: 15px;
+    }
+    
+    th, td {
+        padding: 8px 12px;
+    }
+}
+</style>
+{% endblock %}
